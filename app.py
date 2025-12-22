@@ -5,21 +5,20 @@ import numpy as np
 import os
 import base64
 
-# --- 1. وظيفة تحويل الصورة ---
+# --- 1. وظائف تقنية ---
 def get_image_base64(path):
     try:
         with open(path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
         return f"data:image/jpeg;base64,{encoded_string}"
-    except Exception:
-        return None
+    except: return None
 
 # 2. إعدادات الصفحة
 st.set_page_config(page_title="Strategic AI Manager", layout="wide", page_icon="👨‍💼")
 
-# 3. تهيئة البيانات واللغة
+# 3. تهيئة البيانات المركزية
 if 'db_init' not in st.session_state:
-    st.session_state.lang = "ar"  # اللغة الافتراضية
+    st.session_state.lang = "ar"
     prods = ['Cola 330ml', 'Cola 1.5L', 'Water 500ml', 'Flour 5kg', 'Pasta']
     whs = ['Dubai Central', 'Abu Dhabi Main', 'Sharjah Hub']
     inv = []
@@ -44,93 +43,76 @@ if 'db_init' not in st.session_state:
     st.session_state.chat_history = [] 
     st.session_state.db_init = True
 
-# --- قاموس الترجمة ---
-texts = {
-    "ar": {
-        "title": "🏛️ مركز الإدارة والتحليل الاستراتيجي",
-        "sidebar_title": "المستشار طارق",
-        "sidebar_sub": "مدير العمليات الذكي",
-        "eff": "كفاءة النظام",
-        "active_trucks": "شاحنات نشطة",
-        "delays": "تأخيرات 🔴",
-        "total_inv": "إجمالي المخزون",
-        "tab1": "🚛 الرقابة الجغرافية",
-        "tab2": "📦 حالة المستودعات",
-        "tab3": "📊 الرؤية البيانية",
-        "chat_placeholder": "تحدث معي.. كيف نحسن العمل؟",
-        "response_intro": "أهلاً أستاذ طارق. بناءً على التحليل اللحظي: ",
-    },
-    "en": {
-        "title": "🏛️ Strategic Management & Analytics Center",
-        "sidebar_title": "Consultant Tariq",
-        "sidebar_sub": "AI Operations Manager",
-        "eff": "System Efficiency",
-        "active_trucks": "Active Trucks",
-        "delays": "Delays 🔴",
-        "total_inv": "Total Inventory",
-        "tab1": "🚛 Geographic Control",
-        "tab2": "📦 Warehouse Status",
-        "tab3": "📊 Analytics Vision",
-        "chat_placeholder": "Chat with me.. How can we improve?",
-        "response_intro": "Hello Mr. Tariq. Based on real-time analysis: ",
-    }
-}
-
-L = texts[st.session_state.lang]
-
-# تعريف المتغيرات
+# تعريف المتغيرات للتحليل
 df_ord = st.session_state.df_orders
-df_inv = st.session_state.df_inv
-delayed_count = len(df_ord[df_ord['Status'].str.contains('Delayed|متأخر')])
-efficiency = 100 - (delayed_count/len(df_ord)*100) if len(df_ord) > 0 else 100
+delayed_df = df_ord[df_ord['Status'].str.contains('Delayed|متأخر')]
+efficiency = 100 - (len(delayed_df)/len(df_ord)*100) if len(df_ord) > 0 else 100
 user_avatar = get_image_base64("me.jpg")
 
-# --- 4. القائمة الجانبية ---
+# --- 4. القائمة الجانبية (AI Dialogue Engine) ---
 with st.sidebar:
-    # اختيار اللغة
-    st.session_state.lang = st.selectbox("🌐 Language / اللغة", ["ar", "en"], index=0 if st.session_state.lang == "ar" else 1)
+    st.session_state.lang = st.selectbox("🌐 Language", ["ar", "en"], index=0 if st.session_state.lang == "ar" else 1)
     st.markdown("---")
     
     if user_avatar:
-        st.markdown(f'<div style="display: flex; justify-content: center;"><img src="{user_avatar}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #1E3A8A;"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center"><img src="{user_avatar}" style="width:100px;border-radius:50%;border:3px solid #1E3A8A;"></div>', unsafe_allow_html=True)
     
-    st.markdown(f"<h3 style='text-align: center;'>{L['sidebar_title']}</h3>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align: center; color: #1E3A8A;'>{L['sidebar_sub']}</p>", unsafe_allow_html=True)
-    st.markdown("---")
+    st.markdown(f"<h3 style='text-align:center'>{'المستشار طارق' if st.session_state.lang == 'ar' else 'Consultant Tariq'}</h3>", unsafe_allow_html=True)
     
+    # عرض المحادثة
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"], avatar=user_avatar if msg["role"] == "assistant" else None):
             st.markdown(msg["content"])
 
-    if prompt := st.chat_input(L["chat_placeholder"]):
+    if prompt := st.chat_input("Type your question..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        with st.chat_message("user"): st.markdown(prompt)
 
         with st.chat_message("assistant", avatar=user_avatar):
-            if st.session_state.lang == "ar":
-                res = f"أهلاً أستاذ طارق، كفاءة النظام حالياً {efficiency:.1f}%. رصدت {delayed_count} تأخيرات. بصفتي مستشارك، أنصح بالتدخل الفوري."
+            # --- محرك التحليل الذكي ---
+            query = prompt.lower()
+            if "delay" in query or "تأخير" in query or "تاخير" in query:
+                # الرد بناءً على تحليل حقيقي للبيانات
+                cities = delayed_df['City'].unique()
+                drivers_list = delayed_df['Driver'].unique()
+                if st.session_state.lang == "ar":
+                    response = f"### 🔴 تحليل التأخيرات اللحظي\n\nأهلاً أستاذ طارق. لقد قمت بتحليل الأسطول الآن؛ لدينا **{len(delayed_df)}** شحنة متأخرة. \n\n"
+                    response += f"**المناطق المتأثرة:** {', '.join(cities)}.\n"
+                    response += f"**السائقين المعنيين:** {', '.join(drivers_list)}.\n\n"
+                    response += "بناءً على هذا، المشكلة تبدو متعلقة بضغط العمل في تلك المسارات. أنصح بالتواصل مع السائقين أو إعادة جدولة طلبات الـ VIP أولاً."
+                else:
+                    response = f"### 🔴 Real-time Delay Analysis\n\nI have analyzed the fleet data. We currently have **{len(delayed_df)}** delayed shipments.\n\n"
+                    response += f"**Affected Areas:** {', '.join(cities)}.\n"
+                    response += f"**Drivers Involved:** {', '.join(drivers_list)}.\n\n"
+                    response += "Recommendation: The bottleneck seems to be route-specific. I suggest prioritizing VIP orders and re-routing available trucks."
+            
+            elif "hello" in query or "مرحبا" in query or "اهلا" in query:
+                if st.session_state.lang == "ar":
+                    response = f"أهلاً بك يا أستاذ طارق. كفاءة النظام الحالية هي {efficiency:.1f}%. كيف يمكنني مساعدتك في تحسين الأداء اليوم؟"
+                else:
+                    response = f"Hello Mr. Tariq. Current efficiency is {efficiency:.1f}%. How can I assist you in optimizing operations today?"
+            
             else:
-                res = f"Hello Mr. Tariq, current efficiency is {efficiency:.1f}%. I detected {delayed_count} delays. As your advisor, I recommend immediate intervention."
-            st.markdown(res)
-            st.session_state.chat_history.append({"role": "assistant", "content": res})
+                if st.session_state.lang == "ar":
+                    response = "لقد استلمت استفسارك. هل تود مني تحليل بيانات المستودعات أم تعمق أكثر في أداء السائقين والرحلات المتأخرة؟"
+                else:
+                    response = "I've received your query. Would you like me to analyze warehouse data or dive deeper into driver performance and delayed trips?"
 
-# --- 5. الواجهة الرئيسية ---
-st.markdown(f"<h1 style='text-align: center; color: #1E3A8A;'>{L['title']}</h1>", unsafe_allow_html=True)
+            st.markdown(response)
+            st.session_state.chat_history.append({"role": "assistant", "content": response})
 
+# --- 5. الواجهة الرئيسية (تبقى كما هي لضمان الـ KPIs) ---
+st.markdown("<h1 style='text-align: center;'>🏭 Strategic Operations Center</h1>", unsafe_allow_html=True)
 k1, k2, k3, k4 = st.columns(4)
-k1.metric(L["eff"], f"{efficiency:.1f}%")
-k2.metric(L["active_trucks"], len(df_ord))
-k3.metric(L["delays"], delayed_count, delta_color="inverse")
-k4.metric(L["total_inv"], f"{df_inv['Stock'].sum():,}")
+k1.metric("Efficiency", f"{efficiency:.1f}%")
+k2.metric("Active Jobs", len(df_ord))
+k3.metric("Delays", len(delayed_df), delta_color="inverse")
+k4.metric("Inventory", f"{st.session_state.df_inv['Stock'].sum():,}")
 
-t1, t2, t3 = st.tabs([L["tab1"], L["tab2"], L["tab3"]])
-
-with t1:
-    st.dataframe(df_ord, use_container_width=True)
-with t2:
-    st.dataframe(df_inv, use_container_width=True)
-with t3:
+tab1, tab2, tab3 = st.tabs(["Fleet", "Warehouse", "Analytics"])
+with tab1: st.dataframe(df_ord, use_container_width=True)
+with tab2: st.dataframe(st.session_state.df_inv, use_container_width=True)
+with tab3:
     c1, c2 = st.columns(2)
-    with c1: st.plotly_chart(px.pie(df_ord, names='Status', hole=0.4, title=L["tab1"]), use_container_width=True)
-    with c2: st.plotly_chart(px.bar(df_inv, x='Product', y='Stock', color='Warehouse', barmode='group', title=L["tab2"]), use_container_width=True)
+    with c1: st.plotly_chart(px.pie(df_ord, names='Status', hole=0.4), use_container_width=True)
+    with c2: st.plotly_chart(px.bar(st.session_state.df_inv, x='Product', y='Stock', color='Warehouse'), use_container_width=True)
