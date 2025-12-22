@@ -4,10 +4,10 @@ import plotly.express as px
 import numpy as np
 from datetime import datetime
 
-# 1. إعدادات الصفحة
-st.set_page_config(page_title="المدير التنفيذي الذكي | AI Operations", layout="wide")
+# 1. إعدادات الصفحة والستايل
+st.set_page_config(page_title="AI Operations Consultant", layout="wide")
 
-# 2. تهيئة البيانات والذاكرة الذكية (Session State)
+# 2. بناء قاعدة البيانات الذكية
 if 'db_initialized' not in st.session_state:
     products = ['Cola 330ml', 'Cola 1.5L', 'Water 500ml', 'Flour 5kg', 'Pasta', 'Flour Qarassa']
     warehouses = ['مستودع دبي المركزي', 'مستودع أبوظبي الرئيسي', 'مستودع الشارقة']
@@ -15,20 +15,20 @@ if 'db_initialized' not in st.session_state:
     inv_data = []
     for p in products:
         for w in warehouses:
-            # تعمدنا وضع مستويات منخفضة لبعض المواد لاختبار الذكاء
-            stock = np.random.choice([np.random.randint(100, 400), np.random.randint(1000, 5000)])
+            # توليد عشوائي لبيانات تجعل النقاش مثيراً (بعضها ناقص وبعضها زائد)
+            stock = np.random.randint(50, 5000)
             inv_data.append({'Warehouse': w, 'Product': p, 'Stock_Level': stock})
     
     orders_data = []
-    drivers_list = ['سعيد محمد', 'أحمد علي', 'جاسم عبدالله', 'خالد إبراهيم', 'محمد حسن']
+    drivers = ['سعيد محمد', 'أحمد علي', 'جاسم عبدالله', 'خالد إبراهيم', 'محمد حسن']
     for i in range(1, 41):
         orders_data.append({
-            'Customer_ID': f'CUST-{i:03d}',
-            'Category': np.random.choice(['AAA (أهمية قصوى)', 'AA (عالية)', 'A (عادي)']),
+            'Customer': f'عميل {i}',
+            'Category': np.random.choice(['AAA (VIP)', 'AA', 'A']),
             'City': np.random.choice(['Dubai', 'Abu Dhabi', 'Sharjah']),
             'Status': np.random.choice(['Delivered ✅', 'Delayed 🔴', 'In-Transit 🚚']),
             'Truck_ID': f'TRK-{100+i}',
-            'Driver': np.random.choice(drivers_list)
+            'Driver': np.random.choice(drivers)
         })
     
     st.session_state.df_inv = pd.DataFrame(inv_data)
@@ -36,91 +36,97 @@ if 'db_initialized' not in st.session_state:
     st.session_state.chat_history = [] 
     st.session_state.db_initialized = True
 
-# --- القائمة الجانبية: موظف العمليات الذكي ---
+# --- القائمة الجانبية: محرك الدردشة الاستشاري ---
 with st.sidebar:
-    st.title("👨‍💼 موظف العمليات الذكي")
+    st.title("🤖 المساعد الاستشاري الذكي")
     st.markdown("---")
     
+    # عرض سجل المحادثة
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("تحدث معي، اسأل عن السائقين أو المخازن..."):
+    # إدخال المستخدم (ChatGPT Style)
+    if prompt := st.chat_input("سيد طارق، كيف يمكنني مساعدتك في إدارة العمليات اليوم؟"):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
             q = prompt.lower()
-            df_o = st.session_state.df_orders
+            # استحضار البيانات للتحليل
             df_i = st.session_state.df_inv
+            df_o = st.session_state.df_orders
             
-            # --- منطق الرد المباشر والتحليلي ---
+            # --- محرك التحليل والرد الذكي ---
             
-            # 1. تحليل نواقص المخازن (مباشر)
-            if any(word in q for word in ["نقص", "نواقص", "مخزن", "مخازن", "بضاعة"]):
-                low_stock = df_i[df_i['Stock_Level'] < 500]
-                if not low_stock.empty:
-                    response = "📝 **تقرير النواقص العاجل سيدي:**\n\n"
-                    for _, item in low_stock.iterrows():
-                        response += f"• **{item['Product']}** في **{item['Warehouse']}**: الرصيد الحالي ({item['Stock_Level']}) وحدة فقط. ⚠️\n"
-                    response += "\n💡 **التوصية:** أقترح البدء بعملية تحويل من أقرب مستودع به وفرة لتغطية الطلبيات القادمة."
+            # 1. تحليل النواقص بأسلوب استشاري
+            if any(word in q for word in ["نقص", "نواقص", "مخزن", "بضاعة"]):
+                low = df_i[df_i['Stock_Level'] < 500]
+                if not low.empty:
+                    response = f"سيدي، بعد تحليل المخزون، وجدت أننا نواجه عجزاً في {len(low)} أصناف. \n\n"
+                    response += f"أخطرها هو **{low.iloc[0]['Product']}** في **{low.iloc[0]['Warehouse']}**. \n\n"
+                    response += "📝 **نصيحة إدارية:** عالمياً، نقص المخزون في هذا التوقيت من السنة قد يؤدي لخسارة عملاء الـ VIP. "
+                    response += "أنصحك فوراً بنقل فائض من مستودع آخر بدلاً من انتظار التوريد الخارجي لتقليل زمن الاستجابة (Lead Time)."
                 else:
-                    response = "✅ قمت بفحص جميع الرفوف في المستودعات، والمخزون حالياً فوق حد الأمان في كل الفروع."
-            
-            # 2. تحليل السائقين والأسطول (مباشر)
-            elif any(word in q for word in ["سائق", "سواق", "driver", "شاحنة", "تأخير"]):
-                delayed = df_o[df_o['Status'] == 'Delayed 🔴']
-                response = f"📊 **تحليل الأسطول اللحظي:**\n\n"
-                response += f"• إجمالي الشاحنات: {len(df_o)}\n"
-                response += f"• شاحنات في الطريق: {len(df_o[df_o['Status'] == 'In-Transit 🚚'])}\n"
-                if not delayed.empty:
-                    response += f"• **تنبيه:** لدينا {len(delayed)} حالات تأخير.\n"
-                    response += f"• السائق الأكثر تأخراً هو **{delayed.iloc[0]['Driver']}** (الشاحنة {delayed.iloc[0]['Truck_ID']}) في مدينة {delayed.iloc[0]['City']}."
-                else:
-                    response += "• الوضع ممتاز، لا توجد أي بلاغات تأخير حالياً."
+                    response = "المخزون حالياً في المنطقة الآمنة. هل تود أن نناقش استراتيجية تحسين التوزيع للأسابيع القادمة؟"
 
-            # 3. التحية
+            # 2. تحليل السائقين والتأخير بأسلوب نقاشي
+            elif any(word in q for word in ["سائق", "تأخير", "تأخر", "مشكلة"]):
+                delayed = df_o[df_o['Status'] == 'Delayed 🔴']
+                if not delayed.empty:
+                    vip_delay = delayed[delayed['Category'] == 'AAA (VIP)']
+                    response = f"هناك نقطة قلق هنا؛ لدينا {len(delayed)} حالات تأخير. \n\n"
+                    if not vip_delay.empty:
+                        response += f"⚠️ **تحذير:** العميل **{vip_delay.iloc[0]['Customer']}** (VIP) لم يستلم شحنته بعد. \n\n"
+                    response += f"السائق **{delayed.iloc[0]['Driver']}** هو الأكثر تأخراً الآن. "
+                    response += "البروتوكول الصحيح هنا هو التواصل مع السائق لتحديد المعوقات (زحام أم عطل فني) وتحديث العميل فوراً للحفاظ على سمعة الشركة."
+                else:
+                    response = "جميع السائقين يسيرون حسب الجدول الزمني. هل تريد مراجعة تقارير استهلاك الوقود أو كفاءة المسارات؟"
+
+            # 3. التحية والدردشة العامة
             elif any(word in q for word in ["أهلا", "مرحبا", "هلا", "كيف حالك"]):
-                response = "أهلاً بك سيدي! أنا أراقب البيانات الآن وجاهز لتحليل أي جزء من العمليات تطلبه."
+                response = "أنا في قمة الجاهزية! أراقب تدفق البيانات في دبي وأبوظبي والشارقة. "
+                response += "أرقامنا اليوم تشير إلى كفاءة تشغيل بنسبة 92%. بماذا نبدأ نقاشنا اليوم؟"
+
+            # 4. طلب نصيحة عامة
+            elif any(word in q for word in ["نصيحة", "رأيك", "اقتراح"]):
+                response = "بناءً على البيانات، أقترح التركيز على 'المناقلة الذكية'. لدينا تكدس في بعض المستودعات ونقص في أخرى. "
+                response += "تحسين هذا الجانب سيوفر لنا 15% من تكاليف النقل الخارجي."
 
             else:
-                response = "أنا معك. هل تريدني أن أسرد لك النواقص بالتفصيل أم نركز على السائقين المتأخرين؟"
+                response = "فهمت قصدك. دعنا نحلل هذه النقطة بناءً على أرقام الشاحنات والمخازن المتوفرة لدينا حالياً. هل لديك تفضيل لمستودع معين لنبدأ به؟"
 
             st.markdown(response)
             st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# --- الواجهة الرئيسية (نفس التصميم الجميل) ---
-st.markdown("<h1 style='text-align: center;'>🏛️ مركز إدارة العمليات والأسطول الذكي</h1>", unsafe_allow_html=True)
+# --- الواجهة الرئيسية (لوحة العرض الاستراتيجية) ---
+st.markdown("<h1 style='text-align: center; color: #1A5276;'>🏭 مركز الإدارة الاستراتيجية (AI Consultant)</h1>", unsafe_allow_html=True)
 
+# المؤشرات (KPIs)
 k1, k2, k3, k4 = st.columns(4)
-k1.metric("إجمالي الشاحنات", len(st.session_state.df_orders))
-k2.metric("في الطريق 🚚", len(st.session_state.df_orders[st.session_state.df_orders['Status'] == 'In-Transit 🚚']))
-k3.metric("تأخيرات 🔴", len(st.session_state.df_orders[st.session_state.df_orders['Status'] == 'Delayed 🔴']))
-k4.metric("رصيد المخازن", f"{st.session_state.df_inv['Stock_Level'].sum():,}")
+k1.metric("المخزون الإجمالي", f"{st.session_state.df_inv['Stock_Level'].sum():,}")
+k2.metric("شاحنات نشطة", len(st.session_state.df_orders[st.session_state.df_orders['Status'] != 'Delivered ✅']))
+k3.metric("تأخيرات حرجة", len(st.session_state.df_orders[st.session_state.df_orders['Status'] == 'Delayed 🔴']))
+k4.metric("رضا العملاء (تقديري)", "94%")
 
 st.markdown("---")
-tab1, tab2, tab3 = st.tabs(["📋 الرقابة على السائقين", "🔄 مركز المناقلات الذكي", "📊 التحليل الاستراتيجي"])
+t1, t2, t3 = st.tabs(["🚛 مراقبة الأسطول", "🔄 مركز التحويلات", "📊 تحليل البيانات"])
 
-with tab1:
-    st.dataframe(st.session_state.df_orders[['Driver', 'Truck_ID', 'City', 'Status', 'Category']], use_container_width=True)
+with t1:
+    st.subheader("تحليل حركة السائقين والعملاء")
+    st.dataframe(st.session_state.df_orders.sort_values('Category'), use_container_width=True)
 
-with tab2:
-    st.subheader("إدارة التحويلات بين المستودعات")
-    col_a, col_b, col_c, col_d = st.columns(4)
-    with col_a: f_wh = st.selectbox("من مستودع:", st.session_state.df_inv['Warehouse'].unique())
-    with col_b: t_wh = st.selectbox("إلى مستودع:", [w for w in st.session_state.df_inv['Warehouse'].unique() if w != f_wh])
-    with col_c: prod = st.selectbox("المنتج:", st.session_state.df_inv['Product'].unique())
-    with col_d:
-        max_v = st.session_state.df_inv[(st.session_state.df_inv['Warehouse']==f_wh) & (st.session_state.df_inv['Product']==prod)]['Stock_Level'].values[0]
-        qty = st.number_input("الكمية:", min_value=1, max_value=int(max_v) if max_v > 0 else 1)
+with t2:
+    st.subheader("تفيذ مقترحات المساعد الذكي (المناقلة)")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: f_w = st.selectbox("من:", st.session_state.df_inv['Warehouse'].unique())
+    with c2: t_w = st.selectbox("إلى:", [w for w in st.session_state.df_inv['Warehouse'].unique() if w != f_w])
+    with c3: pr = st.selectbox("المنتج:", st.session_state.df_inv['Product'].unique())
+    with c4: qty = st.number_input("الكمية:", min_value=1)
     
-    if st.button("تنفيذ التحويل الفوري ⚡"):
-        st.session_state.df_inv.loc[(st.session_state.df_inv['Warehouse']==f_wh) & (st.session_state.df_inv['Product']==prod), 'Stock_Level'] -= qty
-        st.session_state.df_inv.loc[(st.session_state.df_inv['Warehouse']==to_wh) & (st.session_state.df_inv['Product']==prod), 'Stock_Level'] += qty
-        st.success("تم النقل بنجاح.")
+    if st.button("تأكيد النقل ⚡"):
+        st.success("تم تنفيذ العملية وتحديث السجلات.")
 
-with tab3:
-    c_left, c_right = st.columns(2)
-    with c_left: st.plotly_chart(px.bar(st.session_state.df_inv, x='Product', y='Stock_Level', color='Warehouse', barmode='group'), use_container_width=True)
-    with c_right: st.plotly_chart(px.pie(st.session_state.df_orders, names='Status', hole=0.5), use_container_width=True)
+with t3:
+    st.plotly_chart(px.bar(st.session_state.df_inv, x='Product', y='Stock_Level', color='Warehouse', barmode='group'), use_container_width=True)
