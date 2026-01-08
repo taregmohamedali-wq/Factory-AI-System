@@ -4,9 +4,10 @@ import numpy as np
 import plotly.express as px
 import base64
 import os
+from datetime import datetime
 
-# --- 1. إعدادات الصفحة والأفاتار ---
-st.set_page_config(page_title="Strategic AI Manager", layout="wide", page_icon="👨‍💼")
+# --- 1. إعدادات الهوية البصرية ---
+st.set_page_config(page_title="Strategic AI Consultant", layout="wide", page_icon="👨‍💼")
 
 def get_image_base64(path):
     if os.path.exists(path):
@@ -17,25 +18,29 @@ def get_image_base64(path):
 
 user_avatar = get_image_base64("me.jpg")
 
-# --- 2. تهيئة البيانات في الـ Session State ---
+# --- 2. بناء قاعدة بيانات العمليات (محاكاة واقعية) ---
 if 'db_init' not in st.session_state:
+    # بيانات المخازن
     prods = ['Cola 330ml', 'Cola 1.5L', 'Water 500ml', 'Flour 5kg', 'Pasta']
     whs = ['Dubai Central', 'Abu Dhabi Main', 'Sharjah Hub']
     inv = []
     for p in prods:
         for w in whs:
-            inv.append({'Warehouse': w, 'Product': p, 'Stock': np.random.randint(50, 4000)})
+            inv.append({'Warehouse': w, 'Product': p, 'Stock': np.random.randint(50, 5000), 'Min_Limit': 1000})
     
-    orders = []
+    # بيانات الأسطول والعملاء
     drivers = ['Saeed', 'Ahmed', 'Jasim', 'Khaled', 'Mohamed']
     cities = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Al Ain', 'Fujairah']
-    for i in range(1, 61):
+    orders = []
+    for i in range(1, 101):
         orders.append({
-            'Order_ID': f'ORD-{1000+i}',
+            'Order_ID': f'ORD-{2000+i}',
+            'Customer': f'V-Client {np.random.randint(1,20)}',
             'Status': np.random.choice(['Delivered ✅', 'Delayed 🔴', 'In Transit 🚚']),
             'Driver': np.random.choice(drivers),
             'City': np.random.choice(cities),
-            'Quantity': np.random.randint(10, 100)
+            'Delivery_Time': np.random.randint(30, 180), # بالدقائق
+            'Route_Efficiency': np.random.uniform(0.5, 1.0)
         })
     
     st.session_state.df_inv = pd.DataFrame(inv)
@@ -43,96 +48,102 @@ if 'db_init' not in st.session_state:
     st.session_state.chat_history = []
     st.session_state.db_init = True
 
-# --- 3. محرك التحليل الذكي (الاستجابة حسب السؤال) ---
-def smart_response(prompt):
-    q = prompt.lower()
-    df_inv = st.session_state.df_inv
-    df_ord = st.session_state.df_ord
+# --- 3. محرك الاستشارة والذكاء الاصطناعي (Logic & Advice Engine) ---
+def get_strategic_advice(query):
+    q = query.lower()
+    df_i = st.session_state.df_inv
+    df_o = st.session_state.df_ord
     
-    # أ- سؤال عن النقص (اين النقص؟ / بضاعة قليلة)
-    if any(word in q for word in ['نقص', 'قليل', 'ناقص', 'shortage', 'low']):
-        low_stock = df_inv[df_inv['Stock'] < 600]
-        if not low_stock.empty:
-            res = f"سيدي، رصدت نقصاً في **{len(low_stock)}** أصناف. أكثرها حرجاً هو **{low_stock.sort_values('Stock').iloc[0]['Product']}**."
-            return res, low_stock, "table"
-        return "المخزون ممتاز حالياً، لا يوجد صنف تحت حد الخطر.", None, None
+    # أ- التحليل العام الشامل (المخازن + السيارات + العملاء)
+    if any(word in q for word in ['عام', 'تحليل كامل', 'الوضع', 'overall']):
+        low_stock = len(df_i[df_i['Stock'] < df_i['Min_Limit']])
+        delayed = len(df_o[df_o['Status'] == 'Delayed 🔴'])
+        top_city = df_o['City'].value_counts().idxmax()
+        
+        advice = f"""
+        ### 📊 التقرير الاستراتيجي الشامل:
+        1. **المخازن:** يوجد لدينا **{low_stock}** منتجات تحت حد الطلب. أنصح بجدولة توريد فورية.
+        2. **الأسطول:** هناك **{delayed}** شحنة متأخرة، مما يؤثر على سمعة الشركة لدى العملاء.
+        3. **العملاء:** مدينة **{top_city}** هي الأكثر طلباً حالياً، يجب تكثيف السيارات هناك.
+        
+        💡 **نصيحة استشارية:** بناءً على معايير (Supply Chain Excellence)، أنصحك بتقليل الفاقد في مستودع الشارقة لتحسين التدفق النقدي.
+        """
+        return advice, "general"
 
-    # ب- سؤال عن وضع المخزون العام (رسم بياني)
-    if any(word in q for word in ['مخزون', 'وضع', 'كل', 'inventory', 'stock']):
-        res = f"إجمالي المخزون الحالي في جميع الفروع هو **{df_inv['Stock'].sum():,}** وحدة."
-        return res, df_inv, "chart"
+    # ب- ذكاء الطرق والخرائط (محاكاة البحث في الخرائط)
+    if any(word in q for word in ['طريق', 'شارع', 'أسرع', 'خريطة', 'route', 'map']):
+        fastest_route = "شارع الشيخ محمد بن زايد (E311)"
+        alternative = "شارع الإمارات (E611)"
+        advice = f"""
+        ### 🗺️ تحليل المسارات الذكي (Real-time Simulation):
+        بناءً على تحديثات المرور الحالية في الإمارات:
+        * **المسار الأسرع:** حالياً هو **{fastest_route}** نظراً لسيولة الحركة.
+        * **تحذير:** تجنب وسط مدينة دبي (منطقة القوز) لوجود أعمال صيانة مؤقتة.
+        * **توصية:** وجه السائقين (Saeed و Ahmed) لاتخاذ المخرج رقم 45 لتوفير 15 دقيقة من زمن التسليم.
+        """
+        return advice, "map"
 
-    # ج- سؤال عن السائقين أو الأداء
-    if any(word in q for word in ['سائق', 'أداء', 'سواق', 'driver']):
-        top_driver = df_ord[df_ord['Status'] == 'Delivered ✅']['Driver'].value_counts()
-        res = f"أفضل سائق من حيث الإنجاز هو **{top_driver.index[0]}** بـ {top_driver.values[0]} شحنة مكتملة."
-        return res, top_driver.to_frame(), "table"
+    # ج- تحليل النواقص والطلبيات الحرج
+    if any(word in q for word in ['نقص', 'نواقص', 'shortage']):
+        critical = df_i[df_i['Stock'] < 500]
+        advice = "### ⚠️ تقرير النواقص الحرجة:\n"
+        for _, row in critical.iterrows():
+            advice += f"* المنتج **{row['Product']}** في {row['Warehouse']} وصل لمستوى **{row['Stock']}** (حرج جداً!).\n"
+        return advice, "table"
 
-    # د- سؤال عن التأخير
-    if any(word in q for word in ['تأخير', 'مشكلة', 'delayed']):
-        delayed_df = df_ord[df_ord['Status'] == 'Delayed 🔴']
-        res = f"هناك **{len(delayed_df)}** شحنة متأخرة حالياً. المشكلة تتركز في **{delayed_df['City'].value_counts().index[0]}**."
-        return res, delayed_df, "table"
+    return "مرحباً أستاذ طارق. أنا مستشارك الرقمي. اطلب مني (تحليل كامل للوضع، أسرع طريق للمدينة، أو تقرير النواقص) وسأقوم بالبحث والتحليل فوراً.", "text"
 
-    return "مرحباً أستاذ طارق. أنا جاهز لتحليل العمليات. يمكنك سؤالي عن (النقص، المخزون العام، أداء السائقين، أو التأخير).", None, None
-
-# --- 4. تصميم الواجهة (Sidebar & Chat) ---
+# --- 4. تصميم الواجهة الجانبية (الشات الاستشاري) ---
 with st.sidebar:
     if user_avatar:
-        st.markdown(f'<div style="text-align:center"><img src="{user_avatar}" style="width:100px;border-radius:50%;border:3px solid #1E3A8A;"></div>', unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align:center'>المستشار طارق</h2>", unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center"><img src="{user_avatar}" style="width:100px;border-radius:50%;border:3px solid #00FFCC;"></div>', unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center'>المستشار طارق AI</h2>", unsafe_allow_html=True)
     st.markdown("---")
-    
-    # عرض الدردشة
+
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"], avatar=user_avatar if msg["role"] == "assistant" else None):
             st.markdown(msg["content"])
-            if "data" in msg:
-                if msg["type"] == "table": st.dataframe(msg["data"], use_container_width=True)
-                if msg["type"] == "chart": 
-                    fig = px.bar(msg["data"], x='Product', y='Stock', color='Warehouse', barmode='group')
-                    st.plotly_chart(fig, use_container_width=True)
 
-    if prompt := st.chat_input("اسألني أي شيء عن العمليات..."):
+    if prompt := st.chat_input("اطلب استشارة: تحليل كامل، أسرع طريق..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
-        text_res, data_res, type_res = smart_response(prompt)
+        with st.chat_message("user"): st.markdown(prompt)
         
-        msg_obj = {"role": "assistant", "content": text_res}
-        if data_res is not None:
-            msg_obj["data"] = data_res
-            msg_obj["type"] = type_res
-            
-        st.session_state.chat_history.append(msg_obj)
-        st.rerun()
+        response_text, res_type = get_strategic_advice(prompt)
+        
+        with st.chat_message("assistant", avatar=user_avatar):
+            st.markdown(response_text)
+            # إظهار داشبورد مصغر داخل الشات لو كان التحليل عاماً
+            if res_type == "general":
+                st.line_chart(st.session_state.df_ord.groupby('City')['Delivery_Time'].mean())
+        
+        st.session_state.chat_history.append({"role": "assistant", "content": response_text})
 
-# --- 5. الواجهة الرئيسية (The Professional Dashboard) ---
-st.markdown("<h1 style='text-align: center;'>📊 Strategic Operations Center</h1>", unsafe_allow_html=True)
+# --- 5. الواجهة الرئيسية (Strategic Dashboard) ---
+st.markdown("<h1 style='text-align: center;'>🌐 Global Strategic Operations Hub</h1>", unsafe_allow_html=True)
 
-# صف المؤشرات العلوية (KPIs)
+# مؤشرات الأداء الكبرى
 m1, m2, m3, m4 = st.columns(4)
-total_inv = st.session_state.df_inv['Stock'].sum()
-delayed_count = len(st.session_state.df_ord[st.session_state.df_ord['Status'] == 'Delayed 🔴'])
-delivered_rate = (len(st.session_state.df_ord[st.session_state.df_ord['Status'] == 'Delivered ✅']) / len(st.session_state.df_ord)) * 100
-
-m1.metric("إجمالي المخزون", f"{total_inv:,}")
-m2.metric("شحنات متأخرة", delayed_count, delta="-2" if delayed_count > 5 else "0", delta_color="inverse")
-m3.metric("نسبة النجاح", f"{delivered_rate:.1f}%")
-m4.metric("عدد السائقين", "5")
+m1.metric("إجمالي الأصول", f"{st.session_state.df_inv['Stock'].sum():,}", "Active")
+m2.metric("كفاءة المسارات", "92%", "+3%")
+m3.metric("رضا العملاء", "4.8/5", "⭐")
+m4.metric("تنبؤات الذكاء", "مستقرة")
 
 st.markdown("---")
+c1, c2 = st.columns([2, 1])
 
-# الرسوم البيانية الرئيسية
-col_left, col_right = st.columns(2)
+with c1:
+    st.subheader("📊 تحليل تدفق المنتجات عبر المدن")
+    fig = px.area(st.session_state.df_ord.sort_values('City'), x='City', y='Delivery_Time', color='Driver', title="زمن التسليم لكل مدينة حسب السائق")
+    st.plotly_chart(fig, use_container_width=True)
 
-with col_left:
-    st.subheader("📦 توزيع المخزون حسب الصنف")
-    fig1 = px.bar(st.session_state.df_inv.groupby('Product')['Stock'].sum().reset_index(), x='Product', y='Stock', color_discrete_sequence=['#00CC96'])
-    st.plotly_chart(fig1, use_container_width=True)
-
-with col_right:
-    st.subheader("🚚 حالة الأسطول الحالي")
-    fig2 = px.pie(st.session_state.df_ord, names='Status', hole=0.4, color_discrete_map={'Delivered ✅':'green', 'Delayed 🔴':'red', 'In Transit 🚚':'orange'})
-    st.plotly_chart(fig2, use_container_width=True)
-
-st.subheader("📋 تفاصيل البيانات التشغيلية")
-st.dataframe(st.session_state.df_inv, use_container_width=True)
+with c2:
+    st.subheader("💡 نصيحة استشارية اليوم")
+    st.info("بناءً على بيانات السوق، يرتفع الطلب على 'Flour 5kg' في عطلة نهاية الأسبوع. تأكد من شحن مستودع أبوظبي اليوم بنسبة 20% إضافية.")
+    
+    st.subheader("🌍 مراقبة المواقع")
+    # محاكاة خريطة (Map)
+    map_data = pd.DataFrame({
+        'lat': [25.276987, 24.453884, 25.346255],
+        'lon': [55.296249, 54.377343, 55.420932]
+    })
+    st.map(map_data)
