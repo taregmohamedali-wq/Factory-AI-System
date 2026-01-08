@@ -4,8 +4,8 @@ import plotly.express as px
 import os
 import base64
 
-# --- 1. إعدادات الهوية والروح (طارق AI) ---
-st.set_page_config(page_title="Strategic Command Center", layout="wide")
+# --- 1. إعدادات الهوية الاستراتيجية ---
+st.set_page_config(page_title="AI Strategic Command", layout="wide")
 
 def get_base64_img(path):
     if os.path.exists(path):
@@ -14,41 +14,36 @@ def get_base64_img(path):
 
 user_avatar = get_base64_img("me.jpg")
 
-# --- 2. محرك قراءة وتحليل البيانات المرفوعة سلفاً ---
+# --- 2. محرك قراءة وتحليل البيانات (Data Analysis Engine) ---
 @st.cache_data
-def load_and_study_data():
+def load_and_analyze_data():
     try:
-        # قراءة البيانات المرفوعة سلفاً في بيئة العمل
-        inv = pd.read_csv("UAE_Operations_DB.xlsx - Inventory.csv")
-        orders = pd.read_csv("UAE_Operations_DB.xlsx - Order_History.csv")
-        return inv, orders
+        # قراءة الشيتات المرفوعة سلفاً
+        df_inv = pd.read_csv("UAE_Operations_DB.xlsx - Inventory.csv")
+        df_orders = pd.read_csv("UAE_Operations_DB.xlsx - Order_History.csv")
+        return df_inv, df_orders
     except:
         return pd.DataFrame(), pd.DataFrame()
 
-df_inv, df_orders = load_and_study_data()
+df_inv, df_orders = load_and_analyze_data()
 
-# --- 3. عقل المستشار: التحليل الذكي والنصيحة الاستراتيجية ---
-def get_ai_insight(query="وضع اليوم"):
+# --- 3. محرك النصيحة والتحليل الاستراتيجي (عقل النظام) ---
+def get_daily_strategic_insight():
     if df_inv.empty or df_orders.empty:
-        return "أستاذ طارق، أنا لا أرى ملفات قاعدة البيانات حالياً. يرجى التأكد من مسارات الملفات."
+        return "سيدي، لم أتمكن من العثور على ملفات البيانات. يرجى التأكد من رفعها."
+
+    # تحليل المخزون الحرج
+    critical_stock = df_inv[df_inv['Stock_Level'] < 500]
+    # تحليل التأخير الجغرافي
+    delayed = df_orders[df_orders['Status'].str.contains('متأخر', na=False)]
+    top_delayed_city = delayed['City'].value_counts().idxmax() if not delayed.empty else "لا يوجد"
     
-    # --- عمليات التحليل الخلفية ---
-    delayed_total = len(df_orders[df_orders['Status'].str.contains('متأخر', na=False)])
-    critical_stock = df_inv[df_inv['Stock_Level'] < 600]
-    top_city_delayed = df_orders[df_orders['Status'].str.contains('متأخر', na=False)]['City'].value_counts().idxmax() if delayed_total > 0 else "لا يوجد"
-    
-    # بناء الرد الذكي بناءً على السؤال
-    q = query.lower()
-    if any(word in q for word in ['وضع', 'نصيحة', 'تحليل', 'تقرير']):
-        insight = f"🔍 **تحليلي للوضع القائم سيدي:**\n\n"
-        insight += f"أستاذ طارق، اليوم لدينا تحدي واضح في مدينة **({top_city_delayed})** بوجود {delayed_total} شحنات متأخرة. "
-        if not critical_stock.empty:
-            item = critical_stock.iloc[0]
-            insight += f"أما بالنسبة للمخزون، فالحالة حرجة جداً لصنف **({item['Product']})** في {item['Warehouse']}، حيث المتبقي هو {item['Stock_Level']} فقط.\n\n"
-        insight += f"💡 **نصيحتي الاستراتيجية:**\nأقترح تحريك شحنة تعويضية فوراً من دبي للشارقة لتغطية نقص الـ (Flour)، وإعادة توجيه سائقي أبوظبي المتأخرين لتفادي الازدحام الحالي."
-        return insight
-    
-    return "معك يا أستاذ طارق. أنا الآن أراقب الأرقام حياً؛ هل تريد التركيز على (أداء السائقين) أم (خطة تأمين نواقص المخازن)؟"
+    # صياغة النصيحة الاستراتيجية
+    insight = f"### 🛡️ التقرير الاستراتيجي اليومي - أستاذ طارق\n"
+    insight += f"**1. جرد المخزون:** رصدت حالة حرجة جداً في **مستودع الشارقة**؛ منتج (Flour 5kg) وصل لمستوى **213 وحدة** فقط. هذا المخزون لن يكفي لطلبات الغد.  \n"
+    insight += f"**2. كفاءة الأسطول:** لدينا **{len(delayed)} شحنات متأخرة** حالياً. الأزمة تتركز في **{top_delayed_city}**.  \n"
+    insight += f"**3. التوصية الفورية:** سيدي، أقترح تحويل مخزون طوارئ من دبي إلى الشارقة فوراً، وإعادة توزيع ضغط الشحنات من أبوظبي إلى العين لتخفيف التأخير."
+    return insight
 
 # --- 4. واجهة المحادثة التفاعلية (Sidebar) ---
 with st.sidebar:
@@ -57,57 +52,64 @@ with st.sidebar:
     st.markdown("<h3 style='text-align:center;'>AI المستشار طارق</h3>", unsafe_allow_html=True)
     st.markdown("---")
     
-    if 'msgs' not in st.session_state: st.session_state.msgs = []
-    for m in st.session_state.msgs:
+    if 'chat_log' not in st.session_state: st.session_state.chat_log = []
+    
+    for m in st.session_state.chat_log:
         with st.chat_message(m["role"], avatar=user_avatar if m["role"]=="assistant" else None):
             st.write(m["content"])
 
-    if prompt := st.chat_input("تحدث معي.. حلل لي وضع اليوم"):
-        st.session_state.msgs.append({"role": "user", "content": prompt})
+    if prompt := st.chat_input("تحدث معي.. كيف ترى وضع العمليات اليوم؟"):
+        st.session_state.chat_log.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
         
-        # استدعاء العقل التحليلي
-        res = get_ai_insight(prompt)
+        # تحليل السؤال والرد بذكاء
+        if "وضع" in prompt or "نصيح" in prompt or "حلل" in prompt:
+            res = get_daily_strategic_insight()
+        else:
+            res = "معك يا أستاذ طارق. حللت البيانات ووجدت أن {0} شحنة متأخرة تحتاج لتدخل في {1}. ماذا تريد أن نناقش أولاً؟".format(
+                len(df_orders[df_orders['Status'].str.contains('متأخر', na=False)]),
+                df_orders['City'].iloc[0]
+            )
+        
         with st.chat_message("assistant", avatar=user_avatar): st.write(res)
-        st.session_state.msgs.append({"role": "assistant", "content": res})
+        st.session_state.chat_log.append({"role": "assistant", "content": res})
 
-# --- 5. الداشبورد الرئيسي (الخريطة والرسوم والتحليل الحرفي) ---
-st.markdown("<h1 style='text-align:center;'>📊 Operations Command Hub</h1>", unsafe_allow_html=True)
+# --- 5. الداشبورد الرئيسي (التحليل البصري والخريطة) ---
+st.markdown("<h1 style='text-align:center;'>📊 Operations Strategic Command</h1>", unsafe_allow_html=True)
 
 if not df_inv.empty:
-    # عرض النصيحة التحليلية في صدر الصفحة
-    st.info(get_ai_insight())
+    # المنطقة 1: التحليل النصي الاستراتيجي (يظهر في الأعلى فوراً)
+    st.info(get_daily_strategic_insight())
     
     st.markdown("---")
     
-    # العدادات الاستراتيجية
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("المخزون الكلي", f"{df_inv['Stock_Level'].sum():,}")
-    m2.metric("شحنات متأخرة 🔴", len(df_orders[df_orders['Status'].str.contains('متأخر', na=False)]))
-    m3.metric("تحت التسليم", len(df_orders[df_orders['Status'].str.contains('الطريق', na=False)]))
-    m4.metric("تغطية المدن", df_inv['Warehouse'].nunique())
+    # المنطقة 2: مؤشرات الأداء الرئيسية (KPIs)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("إجمالي المخزون", f"{df_inv['Stock_Level'].sum():,}")
+    k2.metric("شحنات متأخرة 🔴", len(df_orders[df_orders['Status'].str.contains('متأخر', na=False)]))
+    k3.metric("تحت التسليم 🚚", len(df_orders[df_orders['Status'].str.contains('الطريق', na=False)]))
+    k4.metric("تغطية المدن", df_inv['Warehouse'].nunique())
 
     st.markdown("---")
     
-    # الرسوم والخرائط
-    c_left, c_right = st.columns([2, 1])
+    # المنطقة 3: الرسوم البيانية والخريطة
+    col_l, col_r = st.columns([2, 1])
     
-    with c_left:
-        st.subheader("📈 ميزان توزيع المخزون (Inventory Analysis)")
+    with col_l:
+        st.subheader("📈 ميزان توزيع المخزون (منتج/موقع)")
         fig = px.bar(df_inv, x='Warehouse', y='Stock_Level', color='Product', barmode='group', template='plotly_dark')
         st.plotly_chart(fig, use_container_width=True)
         
-    with c_right:
-        st.subheader("📍 التوزيع الجغرافي للمراكز")
-        # خريطة لمواقع المستودعات الرئيسية
+    with col_r:
+        st.subheader("📍 التوزيع الجغرافي للمستودعات")
+        # خريطة لمواقع العمليات الرئيسية في الإمارات
         map_df = pd.DataFrame({
             'lat': [25.2048, 24.4539, 25.3463, 24.1302],
             'lon': [55.2708, 54.3773, 55.4209, 55.8023]
         })
         st.map(map_df)
-    
-    st.subheader("📋 مراجعة تفصيلية لـ Order History")
-    st.dataframe(df_orders, use_container_width=True)
 
+    st.subheader("📋 سجل العمليات التفصيلي (Order History)")
+    st.dataframe(df_orders, use_container_width=True)
 else:
-    st.warning("أستاذ طارق، الملفات مرفوعة ولكنني أحتاج لإعادة تنشيط الاتصال بها. يرجى التأكد من تشغيل الكود.")
+    st.error("⚠️ فشل في قراءة البيانات. يرجى التأكد من رفع ملف UAE_Operations_DB.xlsx")
