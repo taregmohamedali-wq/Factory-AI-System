@@ -1,25 +1,24 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.express as px
 import base64
 import os
 
-# --- 1. وظيفة الأفاتار المحسنة ---
+# --- 1. إعدادات الصفحة والأفاتار ---
+st.set_page_config(page_title="Strategic AI Manager", layout="wide", page_icon="👨‍💼")
+
 def get_image_base64(path):
     if os.path.exists(path):
         with open(path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
         return f"data:image/jpeg;base64,{encoded_string}"
-    else:
-        # في حال لم يجد الصورة، سيعطيك لوناً افتراضياً بدلاً من كسر الكود
-        return None
+    return None
 
-# 2. إعدادات الصفحة
-st.set_page_config(page_title="Strategic AI Manager", layout="wide", page_icon="👨‍💼")
+user_avatar = get_image_base64("me.jpg")
 
-# 3. تهيئة البيانات (تبقى كما هي لضمان المنطق)
+# --- 2. تهيئة البيانات في الـ Session State ---
 if 'db_init' not in st.session_state:
-    st.session_state.lang = "ar"
     prods = ['Cola 330ml', 'Cola 1.5L', 'Water 500ml', 'Flour 5kg', 'Pasta']
     whs = ['Dubai Central', 'Abu Dhabi Main', 'Sharjah Hub']
     inv = []
@@ -27,74 +26,113 @@ if 'db_init' not in st.session_state:
         for w in whs:
             inv.append({'Warehouse': w, 'Product': p, 'Stock': np.random.randint(50, 4000)})
     
+    orders = []
     drivers = ['Saeed', 'Ahmed', 'Jasim', 'Khaled', 'Mohamed']
     cities = ['Dubai', 'Abu Dhabi', 'Sharjah', 'Al Ain', 'Fujairah']
-    orders = []
-    for i in range(1, 51):
+    for i in range(1, 61):
         orders.append({
             'Order_ID': f'ORD-{1000+i}',
             'Status': np.random.choice(['Delivered ✅', 'Delayed 🔴', 'In Transit 🚚']),
             'Driver': np.random.choice(drivers),
             'City': np.random.choice(cities),
-            'Priority': np.random.choice(['VIP (AAA)', 'High (AA)', 'Normal (A)'])
+            'Quantity': np.random.randint(10, 100)
         })
+    
     st.session_state.df_inv = pd.DataFrame(inv)
-    st.session_state.df_orders = pd.DataFrame(orders)
-    st.session_state.chat_history = [] 
+    st.session_state.df_ord = pd.DataFrame(orders)
+    st.session_state.chat_history = []
     st.session_state.db_init = True
 
-# استدعاء الصورة (تأكد أن ملف me.jpg في نفس مجلد الكود)
-user_avatar = get_image_base64("me.jpg")
-
-# --- 4. محرك الإجابة المنطقية (المستشار طارق) ---
-def advanced_analyser(query):
-    q = query.lower()
-    df_i = st.session_state.df_inv
-    df_o = st.session_state.df_orders
+# --- 3. محرك التحليل الذكي (الاستجابة حسب السؤال) ---
+def smart_response(prompt):
+    q = prompt.lower()
+    df_inv = st.session_state.df_inv
+    df_ord = st.session_state.df_ord
     
-    # منطق الكلمات المفتاحية الذكي
-    if any(word in q for word in ['مخزون', 'بضاعة', 'stock']):
-        total = df_i['Stock'].sum()
-        return f"سيدي، إجمالي المخزون المتاح حالياً هو **{total:,}** وحدة موزعة على جميع المستودعات."
-    
-    if any(word in q for word in ['تأخير', 'مشكلة', 'delay']):
-        delayed = len(df_o[df_o['Status'] == 'Delayed 🔴'])
-        return f"رصدت وجود **{delayed}** شحنات متأخرة. أنصح بالتحقق من قسم التوزيع."
+    # أ- سؤال عن النقص (اين النقص؟ / بضاعة قليلة)
+    if any(word in q for word in ['نقص', 'قليل', 'ناقص', 'shortage', 'low']):
+        low_stock = df_inv[df_inv['Stock'] < 600]
+        if not low_stock.empty:
+            res = f"سيدي، رصدت نقصاً في **{len(low_stock)}** أصناف. أكثرها حرجاً هو **{low_stock.sort_values('Stock').iloc[0]['Product']}**."
+            return res, low_stock, "table"
+        return "المخزون ممتاز حالياً، لا يوجد صنف تحت حد الخطر.", None, None
 
-    if any(word in q for word in ['سائق', 'سواق', 'driver']):
-        top_driver = df_o[df_o['Status'] == 'Delivered ✅']['Driver'].value_counts().index[0]
-        return f"أفضل أداء حالياً هو للسائق **{top_driver}**."
+    # ب- سؤال عن وضع المخزون العام (رسم بياني)
+    if any(word in q for word in ['مخزون', 'وضع', 'كل', 'inventory', 'stock']):
+        res = f"إجمالي المخزون الحالي في جميع الفروع هو **{df_inv['Stock'].sum():,}** وحدة."
+        return res, df_inv, "chart"
 
-    return "مرحباً أستاذ طارق، أنا المحلل الذكي الخاص بك. كيف يمكنني دعم اتخاذ القرار اليوم؟"
+    # ج- سؤال عن السائقين أو الأداء
+    if any(word in q for word in ['سائق', 'أداء', 'سواق', 'driver']):
+        top_driver = df_ord[df_ord['Status'] == 'Delivered ✅']['Driver'].value_counts()
+        res = f"أفضل سائق من حيث الإنجاز هو **{top_driver.index[0]}** بـ {top_driver.values[0]} شحنة مكتملة."
+        return res, top_driver.to_frame(), "table"
 
-# --- 5. الواجهة الجانبية (الشات مع الصورة) ---
+    # د- سؤال عن التأخير
+    if any(word in q for word in ['تأخير', 'مشكلة', 'delayed']):
+        delayed_df = df_ord[df_ord['Status'] == 'Delayed 🔴']
+        res = f"هناك **{len(delayed_df)}** شحنة متأخرة حالياً. المشكلة تتركز في **{delayed_df['City'].value_counts().index[0]}**."
+        return res, delayed_df, "table"
+
+    return "مرحباً أستاذ طارق. أنا جاهز لتحليل العمليات. يمكنك سؤالي عن (النقص، المخزون العام، أداء السائقين، أو التأخير).", None, None
+
+# --- 4. تصميم الواجهة (Sidebar & Chat) ---
 with st.sidebar:
-    # عرض الصورة الشخصية في أعلى القائمة الجانبية كشعار
     if user_avatar:
-        st.markdown(f'<div style="text-align:center"><img src="{user_avatar}" style="width:100px;height:100px;border-radius:50%;border:3px solid #FF4B4B;object-fit:cover;"></div>', unsafe_allow_html=True)
-    
-    st.markdown(f"<h2 style='text-align:center'>المستشار طارق</h2>", unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center"><img src="{user_avatar}" style="width:100px;border-radius:50%;border:3px solid #1E3A8A;"></div>', unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center'>المستشار طارق</h2>", unsafe_allow_html=True)
     st.markdown("---")
-
-    # عرض تاريخ المحادثة مع أيقونة الأفاتار
+    
+    # عرض الدردشة
     for msg in st.session_state.chat_history:
-        # إذا كان المساعد هو من يتحدث، نستخدم الصورة me.jpg
-        avatar_to_show = user_avatar if msg["role"] == "assistant" else None
-        with st.chat_message(msg["role"], avatar=avatar_to_show):
+        with st.chat_message(msg["role"], avatar=user_avatar if msg["role"] == "assistant" else None):
             st.markdown(msg["content"])
+            if "data" in msg:
+                if msg["type"] == "table": st.dataframe(msg["data"], use_container_width=True)
+                if msg["type"] == "chart": 
+                    fig = px.bar(msg["data"], x='Product', y='Stock', color='Warehouse', barmode='group')
+                    st.plotly_chart(fig, use_container_width=True)
 
-    if prompt := st.chat_input("اسألني عن العمليات..."):
+    if prompt := st.chat_input("اسألني أي شيء عن العمليات..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
-        with st.chat_message("user"): 
-            st.markdown(prompt)
+        text_res, data_res, type_res = smart_response(prompt)
         
-        response = advanced_analyser(prompt)
-        
-        # عرض رد الروبوت مع الصورة
-        with st.chat_message("assistant", avatar=user_avatar):
-            st.markdown(response)
-        st.session_state.chat_history.append({"role": "assistant", "content": response})
+        msg_obj = {"role": "assistant", "content": text_res}
+        if data_res is not None:
+            msg_obj["data"] = data_res
+            msg_obj["type"] = type_res
+            
+        st.session_state.chat_history.append(msg_obj)
+        st.rerun()
 
-# --- 6. الواجهة الرئيسية (تبقى كما هي) ---
-st.title("🏭 Strategic Operations Center")
-# (بقية كود الـ Dashboard والرسوم البيانية)
+# --- 5. الواجهة الرئيسية (The Professional Dashboard) ---
+st.markdown("<h1 style='text-align: center;'>📊 Strategic Operations Center</h1>", unsafe_allow_html=True)
+
+# صف المؤشرات العلوية (KPIs)
+m1, m2, m3, m4 = st.columns(4)
+total_inv = st.session_state.df_inv['Stock'].sum()
+delayed_count = len(st.session_state.df_ord[st.session_state.df_ord['Status'] == 'Delayed 🔴'])
+delivered_rate = (len(st.session_state.df_ord[st.session_state.df_ord['Status'] == 'Delivered ✅']) / len(st.session_state.df_ord)) * 100
+
+m1.metric("إجمالي المخزون", f"{total_inv:,}")
+m2.metric("شحنات متأخرة", delayed_count, delta="-2" if delayed_count > 5 else "0", delta_color="inverse")
+m3.metric("نسبة النجاح", f"{delivered_rate:.1f}%")
+m4.metric("عدد السائقين", "5")
+
+st.markdown("---")
+
+# الرسوم البيانية الرئيسية
+col_left, col_right = st.columns(2)
+
+with col_left:
+    st.subheader("📦 توزيع المخزون حسب الصنف")
+    fig1 = px.bar(st.session_state.df_inv.groupby('Product')['Stock'].sum().reset_index(), x='Product', y='Stock', color_discrete_sequence=['#00CC96'])
+    st.plotly_chart(fig1, use_container_width=True)
+
+with col_right:
+    st.subheader("🚚 حالة الأسطول الحالي")
+    fig2 = px.pie(st.session_state.df_ord, names='Status', hole=0.4, color_discrete_map={'Delivered ✅':'green', 'Delayed 🔴':'red', 'In Transit 🚚':'orange'})
+    st.plotly_chart(fig2, use_container_width=True)
+
+st.subheader("📋 تفاصيل البيانات التشغيلية")
+st.dataframe(st.session_state.df_inv, use_container_width=True)
