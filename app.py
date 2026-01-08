@@ -4,119 +4,100 @@ import plotly.express as px
 import os
 import base64
 
-# --- 1. إعدادات النظام والهوية ---
-st.set_page_config(page_title="Strategic AI Advisor", layout="wide", initial_sidebar_state="expanded")
+# --- 1. إعدادات الهوية والتصميم ---
+st.set_page_config(page_title="Strategic AI Advisor", layout="wide")
 
-def get_img_as_base64(file):
-    if os.path.exists(file):
-        with open(file, "rb") as f: data = f.read()
-        return base64.b64encode(data).decode()
+def get_base64_img(path):
+    if os.path.exists(path):
+        with open(path, "rb") as f: return f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode()}"
     return None
 
-img_base64 = get_img_as_base64("me.jpg")
+user_avatar = get_base64_img("me.jpg")
 
-# --- 2. محرك قراءة البيانات المرن (الحل النهائي للـ KeyError) ---
+# --- 2. محرك قراءة البيانات (الحل النهائي لخطأ KeyError) ---
 @st.cache_data
-def load_data():
+def load_and_clean_data():
     file_path = "UAE_Operations_DB.xlsx"
-    if not os.path.exists(file_path): return None, None
-    
-    try:
+    if os.path.exists(file_path):
         xls = pd.ExcelFile(file_path)
         df_inv = pd.read_excel(xls, sheet_name=0)
-        df_fleet = pd.read_excel(xls, sheet_name=1) if len(xls.sheet_names) > 1 else pd.DataFrame()
+        # تنظيف آلي لأسماء الأعمدة لضمان عدم حدوث الخطأ الأحمر
+        df_inv.columns = [str(c).strip() for c in df_inv.columns]
         
-        # تنظيف ذكي للأعمدة (إزالة المسافات وتوحيد الحالة)
-        for df in [df_inv, df_fleet]:
-            if not df.empty: df.columns = [str(c).strip() for c in df.columns]
-            
+        df_fleet = pd.read_excel(xls, sheet_name=1) if len(xls.sheet_names) > 1 else pd.DataFrame()
+        if not df_fleet.empty:
+            df_fleet.columns = [str(c).strip() for c in df_fleet.columns]
         return df_inv, df_fleet
-    except: return None, None
+    return pd.DataFrame(), pd.DataFrame()
 
-df_inv, df_fleet = load_data()
+df_inv, df_fleet = load_and_clean_data()
 
-# --- 3. عقل المستشار (الذكاء التحليلي) ---
-def get_ai_response(user_input):
-    user_input = user_input.lower()
+# --- 3. عقل المستشار (تجاوب ذكي ومنطقي) ---
+def smart_advisor(query):
+    query = query.lower()
     
-    if df_inv is None or df_inv.empty:
-        return "أستاذ طارق، يبدو أنني لا أستطيع الوصول لملف العمليات حالياً. هل يمكنك التأكد من وجوده؟"
+    if df_inv.empty:
+        return "سيدي، لم أستطع قراءة ملف العمليات. تأكد من رفعه بشكل صحيح على GitHub."
 
-    # تحليل "التأخير" بشكل تفصيلي
-    if any(word in user_input for word in ['تاخير', 'تأخير', 'delay', 'متأخر']):
+    # أ- تحليل التأخير (رد مفصل)
+    if any(word in query for word in ['تاخير', 'تأخير', 'delay', 'متأخر']):
         if not df_fleet.empty and 'Status' in df_fleet.columns:
             delayed = df_fleet[df_fleet['Status'].str.contains('Delayed', na=False)]
             if not delayed.empty:
-                drivers = ", ".join(delayed['Driver'].unique())
-                return f"⚠️ **تحليل الأزمة:** سيدي، رصدت {len(delayed)} شحنات متأخرة. المشكلة تكمن بشكل أساسي مع ({drivers}). أنصح بالتدخل الفوري لإعادة توجيه المسارات."
-            return "✅ سيدي، فحصت الأسطول بالكامل؛ جميع الشحنات تتحرك في وقتها المثالي."
+                names = ", ".join(delayed['Driver'].unique())
+                return f"⚠️ **تقرير التأخير:** أستاذ طارق، رصدت {len(delayed)} شحنات متأخرة حالياً. المشكلة تتركز مع السائقين ({names}). هل ترغب في أن أقوم بجدولة اتصال معهم؟"
+            return "✅ سيدي، فحصت حالة الأسطول الآن؛ جميع الشحنات تسير في وقتها المحدد."
 
-    # تحليل "المخزون" و "المدن"
-    cities = {'دبي': 'Dubai', 'أبوظبي': 'Abu Dhabi', 'الشارقة': 'Sharjah', 'العين': 'Al Ain'}
+    # ب- تحليل المدن (دبي، الشارقة، إلخ)
+    cities = {'دبي': 'Dubai', 'الشارقة': 'Sharjah', 'أبوظبي': 'Abu Dhabi', 'العين': 'Al Ain'}
     for ar, en in cities.items():
-        if ar in user_input or en.lower() in user_input:
-            city_stock = df_inv[df_inv['Warehouse'].str.contains(en, case=False, na=False)]
-            if not city_stock.empty:
-                total = city_stock['Stock'].sum()
-                return f"📍 **تقرير {ar}:** المخزون الحالي هو {total:,} وحدة. لاحظت أن مستوى الطلب في {ar} يتزايد، هل نرفع مستوى الأمان للصنف الأكثر طلباً؟"
+        if ar in query or en.lower() in query:
+            data = df_inv[df_inv['Warehouse'].str.contains(en, case=False, na=False)]
+            if not data.empty:
+                total = data['Stock'].sum()
+                return f"📍 **وضع {ar}:** المخزون الحالي هو {total:,} وحدة. لاحظت أن صنف '{data.iloc[0]['Product']}' لديه أعلى مخزون هناك. هل نتحقق من معدل التوزيع؟"
 
-    # تحليل "الوضع العام"
-    if any(word in user_input for word in ['الوضع', 'عام', 'تقرير']):
-        total_inv = df_inv['Stock'].sum()
-        low_stock_count = len(df_inv[df_inv['Stock'] < 500])
-        return f"📊 **الرؤية الاستراتيجية:** سيدي، لدينا مخزون إجمالي {total_inv:,} وحدة. الوضع مستقر تقنياً، ولكن هناك {low_stock_count} أصناف تحت خط الخطر تحتاج انتباهك."
+    # ج- رد ذكي عام
+    return f"معك يا أستاذ طارق. قمت بمسح بيانات {len(df_inv)} صنف مخزني حالاً. هل نبدأ بتحليل (النواقص الحرجة) أم (مراقبة السائقين المتأخرين)؟"
 
-    return "معك أستاذ طارق، قلبي مع العمليات وعقلي في الأرقام. هل تريدني أن أحلل لك (كفاءة السائقين) أم (نواقص المخازن)؟"
-
-# --- 4. واجهة المحادثة التفاعلية (Sidebar) ---
+# --- 4. واجهة الشات التفاعلية (Sidebar) ---
 with st.sidebar:
-    if img_base64:
-        st.markdown(f'<div style="text-align:center"><img src="data:image/png;base64,{img_base64}" style="border-radius:50%; width:130px; border:3px solid #00ffcc; box-shadow: 0px 4px 15px rgba(0,255,204,0.3);"></div>', unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; color: #00ffcc;'>AI المستشار طارق</h2>", unsafe_allow_html=True)
+    if user_avatar:
+        st.markdown(f'<div style="text-align:center"><img src="{user_avatar}" style="border-radius:50%; width:120px; border:3px solid #00ffcc;"></div>', unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center;'>AI المستشار طارق</h3>", unsafe_allow_html=True)
     st.markdown("---")
     
-    if 'chat_history' not in st.session_state: st.session_state.chat_history = []
+    if 'history' not in st.session_state: st.session_state.history = []
     
-    # عرض التاريخ
-    for chat in st.session_state.chat_history:
-        with st.chat_message(chat["role"]): st.write(chat["content"])
+    for m in st.session_state.history:
+        with st.chat_message(m["role"]): st.write(m["content"])
 
-    if prompt := st.chat_input("تحدث معي كشريك استراتيجي..."):
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
+    if prompt := st.chat_input("تحدث معي.. اسأل عن دبي أو التأخير"):
+        st.session_state.history.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
         
-        response = get_ai_response(prompt)
-        with st.chat_message("assistant"): st.write(response)
-        st.session_state.chat_history.append({"role": "assistant", "content": response})
+        # استدعاء العقل الذكي
+        res = smart_advisor(prompt)
+        
+        with st.chat_message("assistant"): st.write(res)
+        st.session_state.history.append({"role": "assistant", "content": res})
 
-# --- 5. لوحة التحكم الرئيسية (Dashboard) ---
-st.markdown("<h1 style='text-align: center;'>🏗️ Strategic Operations Command Center</h1>", unsafe_allow_html=True)
+# --- 5. الصفحة الرئيسية (الداشبورد الواضح) ---
+st.markdown("<h1 style='text-align: center;'>📊 Strategic Operations Hub</h1>", unsafe_allow_html=True)
 
-if df_inv is not None:
-    # العدادات الذكية
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("إجمالي المخزون", f"{df_inv['Stock'].sum():,}")
-    m2.metric("شحنات متأخرة", len(df_fleet[df_fleet['Status'] == 'Delayed 🔴']) if not df_fleet.empty else "0")
-    m3.metric("نسبة النجاح", "94.2%", "+1.2%")
-    m4.metric("السائق المثالي", "Saeed")
+if not df_inv.empty:
+    # العدادات من واقع الملف
+    c1, c2, c3 = st.columns(3)
+    c1.metric("إجمالي المخزون بالملف", f"{df_inv['Stock'].sum():,}")
+    c2.metric("شحنات متأخرة", len(df_fleet[df_fleet['Status'].str.contains('Delayed', na=False)]) if not df_fleet.empty else 0)
+    c3.metric("المستودعات النشطة", df_inv['Warehouse'].nunique())
 
     st.markdown("---")
     
-    c1, c2 = st.columns([2, 1])
-    
-    with c1:
-        st.subheader("📈 ميزان المخزون حسب الموقع")
-        fig = px.bar(df_inv, x='Warehouse', y='Stock', color='Product', barmode='group', template='plotly_dark', color_discrete_sequence=px.colors.qualitative.Pastel)
-        st.plotly_chart(fig, use_container_width=True)
-        
-    with c2:
-        st.subheader("💡 التوصية الاستراتيجية")
-        st.success("**توجيه اليوم:** بناءً على البيانات، هناك فائض مخزون في الشارقة وعجز في دبي. أقترح عملية 'نقل داخلي' لـ 1000 وحدة من Flour 5kg فوراً.")
-        
-        st.subheader("🌍 مراقبة الحركة الحية")
-        st.map(pd.DataFrame({'lat': [25.2, 24.4, 25.3], 'lon': [55.3, 54.4, 55.4]}))
+    # الرسم البياني الواضح
+    st.subheader("📈 توزيع المخزون (تحليل مرئي)")
+    fig = px.bar(df_inv, x='Warehouse', y='Stock', color='Product', barmode='group', template='plotly_dark')
+    st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("📋 معاينة قاعدة بيانات العمليات")
+    st.subheader("📋 معاينة البيانات المربوطة")
     st.dataframe(df_inv, use_container_width=True)
-else:
-    st.error("❌ خطأ: لم يتم العثور على ملف UAE_Operations_DB.xlsx. يرجى رفعه لتفعيل الذكاء.")
