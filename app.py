@@ -4,108 +4,97 @@ import plotly.express as px
 import os
 import base64
 
-# --- 1. إعدادات الهوية البصرية ---
-st.set_page_config(page_title="Strategic Operations AI", layout="wide")
+# --- 1. إعدادات الهوية ---
+st.set_page_config(page_title="Strategic Hub - Tarik", layout="wide")
 
 def get_base64_img(path):
     if os.path.exists(path):
         with open(path, "rb") as f: return f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode()}"
     return None
 
-# جلب صورتك الشخصية لاستخدامها في الشات
-user_avatar_base64 = get_base64_img("me.jpg")
+user_img = get_base64_img("me.jpg")
 
-# --- 2. محرك جلب البيانات الحقيقي ---
+# --- 2. قراءة البيانات الحقيقية (التي أرفقتها) ---
 @st.cache_data
-def load_data_from_files():
-    # الربط المباشر بملفاتك المرفوعة
+def load_data():
     try:
+        # الربط بملفاتك المرفوعة بدقة
         df_inv = pd.read_csv("UAE_Operations_DB.xlsx - Inventory.csv")
         df_orders = pd.read_csv("UAE_Operations_DB.xlsx - Order_History.csv")
         return df_inv, df_orders
-    except:
+    except Exception as e:
         return pd.DataFrame(), pd.DataFrame()
 
-df_inv, df_orders = load_data_from_files()
+df_inv, df_orders = load_data()
 
-# --- 3. عقل المستشار (اسالني) ---
-def strategic_brain(query):
+# --- 3. عقل المستشار (الاستجابة المنطقية) ---
+def smart_advisor(query):
     query = query.lower()
-    
     if df_inv.empty or df_orders.empty:
-        return "أستاذ طارق، الملفات مرفوعة ولكن لا يمكنني قراءتها. تأكد من صحة مسارات الملفات."
+        return "سيدي، النظام لا يرى الملفات حالياً. تأكد من وجود الملفات في المسار الصحيح."
 
-    # أ- تحليل التأخير (الحل لمشكلة عدم المنطقية)
-    if any(word in query for word in ['تاخير', 'تأخير', 'delay', 'متأخر']):
-        # البحث عن كلمة "متأخر 🔴" في عمود Status
-        delayed_data = df_orders[df_orders['Status'].str.contains('متأخر', na=False)]
-        if not delayed_data.empty:
-            count = len(delayed_data)
-            drivers = ", ".join(delayed_data['Driver'].unique()[:3])
-            return f"⚠️ **تقرير التأخير الاستراتيجي:** سيدي، رصدت في ملفك {count} شحنات متأخرة حالياً. المشكلة تتركز عند السائقين: ({drivers}). هل أصدر لك قائمة تفصيلية بمواقعهم؟"
-        return "✅ أستاذ طارق، البيانات تشير إلى أن جميع الرحلات تسير في وقتها، لا تأخير حالياً."
+    # أ- تحليل التأخير (من واقع ملف Order_History)
+    if any(word in query for word in ['تأخير', 'متأخر', 'delay']):
+        delayed = df_orders[df_orders['Status'].str.contains('متأخر', na=False)]
+        if not delayed.empty:
+            return f"⚠️ **تقرير التأخير:** سيدي، رصدت {len(delayed)} شحنة متأخرة. السائقين الأكثر تأثيراً هم {', '.join(delayed['Driver'].unique()[:3])}. هل نراجع الأسباب؟"
+        return "✅ أستاذ طارق، لا يوجد أي تأخير مسجل في السجلات الحالية."
 
-    # ب- تحليل مدينة معينة (دبي، أبوظبي، الشارقة)
-    cities_map = {'دبي': 'دبي', 'أبوظبي': 'أبوظبي', 'الشارقة': 'الشارقة'}
-    for ar_name, search_val in cities_map.items():
-        if ar_name in query:
-            city_stock = df_inv[df_inv['Warehouse'].str.contains(search_val, na=False)]
-            if not city_stock.empty:
-                total = city_stock['Stock_Level'].sum()
-                item_min = city_stock.loc[city_stock['Stock_Level'].idxmin()]
-                return f"📍 **تقرير مخزن {ar_name}:** المخزون الإجمالي هو {total:,} وحدة. لاحظت نقصاً حرجاً في صنف ({item_min['Product']}) حيث وصل لـ {item_min['Stock_Level']} فقط."
+    # ب- تحليل المخزون (من واقع ملف Inventory)
+    if 'دبي' in query or 'dubai' in query:
+        dubai_stock = df_inv[df_inv['Warehouse'].str.contains('دبي', na=False)]['Stock_Level'].sum()
+        return f"📍 **مخزون دبي:** المجموع الحالي هو {dubai_stock:,} وحدة. الوضع مستقر بشكل عام."
 
-    # ج- رد ذكي عام
-    return f"أنا معك أستاذ طارق. حللت لك الآن {len(df_inv)} صنف مخزني و{len(df_orders)} طلبية. هل نبدأ بمناقشة (مستوى الخدمة في دبي) أم (نواقص مستودع الشارقة)؟"
+    return "أنا معك أستاذ طارق، الداشبورد يعمل الآن بالبيانات الحقيقية. هل تريد تحليل (أداء السائقين) أم (نواقص المستودعات)؟"
 
 # --- 4. واجهة المحادثة (Sidebar) ---
 with st.sidebar:
-    if user_avatar_base64:
-        st.markdown(f'<div style="text-align:center"><img src="{user_avatar_base64}" style="border-radius:50%; width:120px; border:3px solid #00ffcc;"></div>', unsafe_allow_html=True)
+    if user_img:
+        st.markdown(f'<div style="text-align:center"><img src="{user_img}" style="border-radius:50%; width:120px; border:3px solid #00ffcc;"></div>', unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center;'>AI المستشار طارق</h3>", unsafe_allow_html=True)
     st.markdown("---")
     
-    if 'history' not in st.session_state: st.session_state.history = []
+    if 'chat_history' not in st.session_state: st.session_state.chat_history = []
     
-    # عرض المحادثة مع صورتك في كل رد للـ Assistant
-    for m in st.session_state.history:
-        avatar_img = user_avatar_base64 if m["role"] == "assistant" else None
-        with st.chat_message(m["role"], avatar=avatar_img):
+    for m in st.session_state.chat_history:
+        # استخدام صورتك كأفاتار في كل رد
+        with st.chat_message(m["role"], avatar=user_img if m["role"]=="assistant" else None):
             st.write(m["content"])
 
-    if prompt := st.chat_input("تحدث معي.. اسأل عن دبي أو التأخير"):
-        st.session_state.history.append({"role": "user", "content": prompt})
+    if prompt := st.chat_input("تحدث معي.."):
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
         
-        # استجابة ذكية من واقع الملفات
-        response = strategic_brain(prompt)
-        
-        with st.chat_message("assistant", avatar=user_avatar_base64):
-            st.write(response)
-        st.session_state.history.append({"role": "assistant", "content": response})
+        response = smart_advisor(prompt)
+        with st.chat_message("assistant", avatar=user_img): st.write(response)
+        st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# --- 5. الداشبورد (التصميم المطلوب) ---
-st.markdown("<h1 style='text-align:center;'>Strategic Operations Hub</h1>", unsafe_allow_html=True)
+# --- 5. الداشبورد الرئيسي (الذي لم يكن يظهر) ---
+st.markdown("<h1 style='text-align:center;'>📊 Strategic Operations Center</h1>", unsafe_allow_html=True)
 
 if not df_inv.empty:
-    # عدادات حقيقية
+    # العدادات الحقيقية
     c1, c2, c3 = st.columns(3)
     c1.metric("إجمالي المخزون", f"{df_inv['Stock_Level'].sum():,}")
-    c2.metric("شحنات متأخرة 🔴", len(df_orders[df_orders['Status'].str.contains('متأخر', na=False)]))
+    c2.metric("طلبات متأخرة 🔴", len(df_orders[df_orders['Status'].str.contains('متأخر', na=False)]))
     c3.metric("المستودعات المغطاة", df_inv['Warehouse'].nunique())
 
     st.markdown("---")
     
     col_l, col_r = st.columns([2, 1])
     with col_l:
-        st.subheader("📊 مستويات المخزون لكل منتج")
+        st.subheader("📈 مستويات المخزون الحقيقية")
         fig = px.bar(df_inv, x='Warehouse', y='Stock_Level', color='Product', barmode='group', template='plotly_dark')
         st.plotly_chart(fig, use_container_width=True)
     
     with col_r:
         st.subheader("💡 الرؤية الاستراتيجية")
-        st.warning(f"تنبيه: مخزون Flour 5kg في الشارقة وصل لـ 213 وحدة فقط! يرجى التحرك.")
+        # تحليل تلقائي للنواقص
+        low_stock_item = df_inv.loc[df_inv['Stock_Level'].idxmin()]
+        st.error(f"تنبيه: مخزون {low_stock_item['Product']} في {low_stock_item['Warehouse']} منخفض جداً ({low_stock_item['Stock_Level']})!")
         st.map(pd.DataFrame({'lat': [25.2, 24.4, 25.3], 'lon': [55.3, 54.4, 55.4]}))
 
-    st.subheader("📋 معاينة سجل العمليات الحية")
+    st.subheader("📋 معاينة سجل العمليات المرفوع")
     st.dataframe(df_orders.head(10), use_container_width=True)
+else:
+    st.error("⚠️ لم أتمكن من قراءة البيانات. تأكد من رفع ملفات CSV المرفقة بجانب الكود.")
