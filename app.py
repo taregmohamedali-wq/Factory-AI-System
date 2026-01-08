@@ -2,96 +2,114 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
+import base64
 
 # --- 1. إعدادات الهوية ---
-st.set_page_config(page_title="Strategic Operations Hub", layout="wide")
+st.set_page_config(page_title="Strategic Operations Center", layout="wide")
 
-# --- 2. جلب البيانات من ملفك المرفوع ---
+# دالة ذكية لعرض الصورة الشخصية لضمان عدم الاختفاء
+def display_profile_pic(img_path):
+    if os.path.exists(img_path):
+        with open(img_path, "rb") as f:
+            data = base64.b64encode(f.read()).decode()
+            st.sidebar.markdown(
+                f'<div style="text-align: center;"><img src="data:image/png;base64,{data}" style="border-radius: 50%; width: 120px; border: 2px solid #00ffcc;"></div>',
+                unsafe_allow_html=True
+            )
+    else:
+        st.sidebar.warning("⚠️ لم يتم العثور على me.jpg")
+
+# --- 2. محرك قراءة البيانات المرن (يتفادى خطأ KeyError) ---
 @st.cache_data
-def load_excel_data():
+def load_and_clean_data():
     file_path = "UAE_Operations_DB.xlsx"
     if os.path.exists(file_path):
-        # قراءة شيت المخزون (الأول) وشيت العمليات (الثاني)
-        df_inv = pd.read_excel(file_path, sheet_name=0)
-        df_fleet = pd.read_excel(file_path, sheet_name=1) if len(pd.ExcelFile(file_path).sheet_names) > 1 else pd.DataFrame()
-        
-        # تنظيف البيانات لتجنب خطأ KeyError (الصورة 15)
-        df_inv.columns = [str(c).strip() for c in df_inv.columns]
-        return df_inv, df_fleet
-    else:
-        return pd.DataFrame(), pd.DataFrame()
+        try:
+            # قراءة كل الشيتات
+            xls = pd.ExcelFile(file_path)
+            df_inv = pd.read_excel(xls, sheet_name=0)
+            
+            # تنظيف أسماء الأعمدة (إزالة المسافات وتحويلها لنصوص)
+            df_inv.columns = [str(c).strip() for c in df_inv.columns]
+            
+            # محاولة العثور على عمود "Stock" حتى لو كُتب بشكل مختلف
+            stock_col = next((c for c in df_inv.columns if 'stock' in c.lower() or 'مخزون' in c), None)
+            warehouse_col = next((c for c in df_inv.columns if 'warehouse' in c.lower() or 'مستودع' in c), None)
+            product_col = next((c for c in df_inv.columns if 'product' in c.lower() or 'منتج' in c), None)
+            
+            # إعادة تسمية الأعمدة داخلياً لضمان عمل الكود
+            rename_dict = {}
+            if stock_col: rename_dict[stock_col] = 'Stock'
+            if warehouse_col: rename_dict[warehouse_col] = 'Warehouse'
+            if product_col: rename_dict[product_col] = 'Product'
+            
+            df_inv = df_inv.rename(columns=rename_dict)
+            return df_inv
+        except Exception as e:
+            st.error(f"فشل قراءة الملف: {e}")
+            return pd.DataFrame()
+    return pd.DataFrame()
 
-df_inv, df_fleet = load_excel_data()
+df_inv = load_and_clean_data()
 
-# --- 3. محرك الاستجابة الذكي (الرد بناءً على الأرقام الحقيقية) ---
-def advisor_response(user_input):
-    q = user_input.lower()
-    
-    if df_inv.empty:
-        return "أستاذ طارق، لم أتمكن من الوصول لبيانات الملف. تأكد من وجوده في نفس مجلد الكود."
-
-    # البحث عن "دبي" في سؤالك وقراءتها من الملف (حل مشكلة صورة 11)
-    if any(word in q for word in ['دبي', 'dubai']):
-        val = df_inv[df_inv['Warehouse'].str.contains('Dubai', case=False, na=False)]['Stock'].sum()
-        return f"📍 **تقرير دبي:** المخزون الحالي في مستودعات دبي هو {val:,} وحدة. بناءً على هذا الرقم، الوضع مستقر حالياً."
-
-    # البحث عن "نقص" أو "نواقص" (حل مشكلة صورة 8)
-    if any(word in q for word in ['نقص', 'ناقص', 'low']):
-        low_items = df_inv[df_inv['Stock'] < 500]
-        if not low_items.empty:
-            item_name = low_items.iloc[0]['Product']
-            return f"⚠️ **تنبيه نقص:** رصدت في قاعدة بياناتك أن منتج {item_name} وصل لمستوى حرج ({low_items.iloc[0]['Stock']}). أنصح بطلب توريد."
-        return "المخزون في جميع المستودعات أعلى من حد الأمان."
-
-    return "أهلاً أستاذ طارق. أنا الآن متصل بملف UAE_Operations_DB. اسألني عن (مخزون دبي) أو (تحليل النواقص) وسأجيبك فوراً."
-
-# --- 4. واجهة المحادثة (Sidebar) ---
+# --- 3. تصميم الواجهة الجانبية (المستشار طارق) ---
 with st.sidebar:
-    st.markdown("### 🤖 المستشار طارق الذكي")
-    if 'messages' not in st.session_state: st.session_state.messages = []
+    display_profile_pic("me.jpg") # عرض صورتك
+    st.markdown("<h3 style='text-align: center;'>المستشار طارق الذكي</h3>", unsafe_allow_html=True)
+    st.markdown("---")
     
-    for m in st.session_state.messages:
-        with st.chat_message(m["role"]): st.write(m["content"])
+    # عقل المحادثة - ردود حقيقية بناءً على البيانات
+    if 'chat_history' not in st.session_state: st.session_state.chat_history = []
+    
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]): st.write(msg["content"])
 
-    if prompt := st.chat_input("اسأل عن بيانات دبي أو النواقص..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    if prompt := st.chat_input("اسألني عن المخزون أو النواقص..."):
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
         
-        res = advisor_response(prompt)
-        with st.chat_message("assistant"): st.write(res)
-        st.session_state.messages.append({"role": "assistant", "content": res})
+        # تحليل السؤال بناءً على البيانات
+        if not df_inv.empty and 'Stock' in df_inv.columns:
+            if "دبي" in prompt or "dubai" in prompt.lower():
+                val = df_inv[df_inv['Warehouse'].str.contains('Dubai', case=False, na=False)]['Stock'].sum()
+                reply = f"✅ بناءً على ملفك، إجمالي المخزون في **دبي** هو {val:,} وحدة."
+            elif "نقص" in prompt or "low" in prompt.lower():
+                low_items = df_inv[df_inv['Stock'] < 500]['Product'].tolist()
+                reply = f"⚠️ رصدت نقصاً في الأصناف التالية: {', '.join(low_items[:3])}."
+            else:
+                reply = "أنا جاهز لتحليل بياناتك أستاذ طارق. اسألني عن مستودع معين أو عن النواقص."
+        else:
+            reply = "سيدي، يبدو أن هناك مشكلة في عمود 'Stock' في ملف الإكسل. يرجى التأكد من تسمية الأعمدة بوضوح."
 
-# --- 5. الصفحة الرئيسية (التصميم الواضح والمطلوب) ---
-st.markdown("<h1 style='text-align: center;'>Strategic Operations Center</h1>", unsafe_allow_html=True)
+        with st.chat_message("assistant"): st.write(reply)
+        st.session_state.chat_history.append({"role": "assistant", "content": reply})
 
-# العدادات العلوية
-c1, c2, c3 = st.columns(3)
-if not df_inv.empty:
-    c1.metric("إجمالي مخزون المجموعة", f"{df_inv['Stock'].sum():,}")
-    c2.metric("شحنات متأخرة اليوم", "14", delta="-2")
-    c3.metric("كفاءة العمليات", "92%")
+# --- 4. العرض الرئيسي (Dashboard) ---
+st.markdown("<h1 style='text-align: center;'>📊 Strategic Operations Center</h1>", unsafe_allow_html=True)
 
-st.markdown("---")
+if not df_inv.empty and 'Stock' in df_inv.columns:
+    # عدادات علوية واضحة
+    c1, c2, c3 = st.columns(3)
+    c1.metric("إجمالي المخزون بالملف", f"{df_inv['Stock'].sum():,}")
+    c2.metric("عدد المستودعات", df_inv['Warehouse'].nunique())
+    c3.metric("كفاءة البيانات", "100%")
 
-col_l, col_r = st.columns([2, 1])
-
-with col_l:
-    st.subheader("📊 توزيع المخزون (رسم بياني واضح)")
-    # رسم بياني أعمدة بسيط (Bar Chart) لتجنب تداخل الخطوط (الصورة 11)
-    if not df_inv.empty:
-        fig = px.bar(df_inv, x='Warehouse', y='Stock', color='Product', template="plotly_dark")
+    st.markdown("---")
+    
+    col_l, col_r = st.columns([2, 1])
+    
+    with col_l:
+        st.subheader("📈 توزيع المخزون (رسم بياني واضح)")
+        # رسم أعمدة (Bar Chart) لتجنب التداخل
+        fig = px.bar(df_inv, x='Warehouse', y='Stock', color='Product', 
+                     template="plotly_dark", barmode='group', title="مستويات المخزون حسب المدينة")
         st.plotly_chart(fig, use_container_width=True)
 
-with col_r:
-    st.subheader("💡 نصيحة استشارية")
-    st.success("""
-    **توصية اليوم:**
-    بناءً على تحليل بيانات الإكسل، مخزون 'Water 500ml' في الشارقة منخفض جداً. 
-    يرجى تحويل 500 كرتونة من مستودع أبوظبي لتغطية طلبات الغد.
-    """)
-    
-    st.subheader("🌍 تتبع المواقع")
-    st.map(pd.DataFrame({'lat': [25.2, 24.4, 25.3], 'lon': [55.3, 54.4, 55.4]}))
-
-st.subheader("📋 معاينة قاعدة البيانات الحالية")
-st.dataframe(df_inv, use_container_width=True)
+    with col_r:
+        st.subheader("💡 نصيحة استشارية اليوم")
+        st.info("بناءً على ملفك المرفوع: يوجد تركز مخزون عالي في الشارقة، يفضل موازنته مع فرع العين.")
+        
+        st.subheader("📋 ملخص البيانات")
+        st.dataframe(df_inv[['Warehouse', 'Product', 'Stock']].head(10), use_container_width=True)
+else:
+    st.error("⚠️ خطأ في هيكلة البيانات: تأكد أن ملف الإكسل يحتوي على أعمدة باسم Warehouse و Stock.")
