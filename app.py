@@ -4,115 +4,105 @@ import plotly.express as px
 import os
 import base64
 
-# --- 1. بناء الهوية البصرية ---
-st.set_page_config(page_title="Strategic Operations Command", layout="wide")
+# --- 1. إعدادات الواجهة الاحترافية ---
+st.set_page_config(page_title="Operations Strategic Command", layout="wide")
 
 def get_base64_img(path):
     if os.path.exists(path):
         with open(path, "rb") as f:
-            return f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode()}"
+            return f"data:image/jpeg;base64,{base64.encodebytes(open(path, 'rb').read()).decode()}"
     return None
 
 user_avatar = get_base64_img("me.jpg")
 
-# --- 2. محرك قراءة البيانات (الربط المباشر بملفاتك) ---
+# --- 2. محرك قراءة ملف الإكسل المرفوع (XLSX) ---
 @st.cache_data
-def load_all_files():
-    try:
-        # الربط بملفاتك المرفوعة سلفاً بنفس أسمائها الدقيقة
-        inv = pd.read_csv("UAE_Operations_DB.xlsx - Inventory.csv")
-        orders = pd.read_csv("UAE_Operations_DB.xlsx - Order_History.csv")
-        return inv, orders
-    except:
-        return pd.DataFrame(), pd.DataFrame()
+def load_excel_data():
+    file_name = "UAE_Operations_DB.xlsx"
+    if os.path.exists(file_name):
+        try:
+            # قراءة الشيتات مباشرة من ملف الإكسل
+            df_inv = pd.read_excel(file_name, sheet_name='Inventory')
+            df_orders = pd.read_excel(file_name, sheet_name='Order_History')
+            return df_inv, df_orders
+        except Exception as e:
+            st.error(f"خطأ في قراءة الشيتات: {e}")
+            return pd.DataFrame(), pd.DataFrame()
+    return pd.DataFrame(), pd.DataFrame()
 
-df_inv, df_orders = load_all_files()
+df_inv, df_orders = load_excel_data()
 
-# --- 3. عقل المستشار (الذكاء الذي يفهم ويحلل) ---
-def strategic_thinking(query):
+# --- 3. عقل المستشار طارق (منطق التحليل الربطي) ---
+def strategic_analysis(query):
     if df_inv.empty or df_orders.empty:
-        return "أستاذ طارق، لم أتمكن من العثور على البيانات. يرجى التأكد من مسار الملفات."
+        return "أستاذ طارق، الملف مرفوع ولكنني أحتاج منك التأكد من أسماء الشيتات داخل الإكسل (Inventory و Order_History)."
 
-    # استخلاص حقائق اللحظة
-    delayed_df = df_orders[df_orders['Status'].str.contains('متأخر', na=False)]
-    critical_stock = df_inv[df_inv['Stock_Level'] < 500]
+    delayed = df_orders[df_orders['Status'].str.contains('متأخر', na=False)]
+    low_stock = df_inv[df_inv['Stock_Level'] < 600]
     
     q = query.lower()
-    
-    # منطق "التحليل الاستباقي"
-    if any(word in q for word in ['وضع', 'تحليل', 'نصيحة', 'ماذا', 'تقرير']):
-        top_city = delayed_df['City'].value_counts().idxmax() if not delayed_df.empty else "المسارات مستقرة"
+    if any(word in q for word in ['وضع', 'تحليل', 'نصيحة', 'ماذا']):
+        top_city = delayed['City'].value_counts().idxmax() if not delayed.empty else "مستقر"
         
-        # ربط الحقائق ببعضها
-        response = f"### 🛡️ قراءتي للموقف العملياتي الآن:\n\n"
-        response += f"سيدي، بعد تحليل سجلات اليوم، رصدت **{len(delayed_df)}** شحنات متأخرة، والمشكلة تتركز بوضوح في **{top_city}**. "
+        msg = f"### 🛡️ التقرير الاستراتيجي لليوم - أستاذ طارق\n\n"
+        msg += f"سيدي، بعد تحليل البيانات، وجدت **{len(delayed)} شحنة متأخرة**، وأغلبها يتركز في **{top_city}**. "
         
-        if not critical_stock.empty:
-            item = critical_stock.iloc[0]
-            response += f"بينما تظهر البيانات خطراً في مستودع **{item['Warehouse']}** لنفاذ صنف **({item['Product']})** (الرصيد: {item['Stock_Level']}).\n\n"
+        if not low_stock.empty:
+            item = low_stock.iloc[0]
+            msg += f"أما المخزون، فهناك خطر في **{item['Warehouse']}** لنفاذ **({item['Product']})** (الرصيد: {item['Stock_Level']}).\n\n"
         
-        response += "💡 **قراري المقترح:** أستاذ طارق، الأولوية الآن لتحريك مخزون طوارئ للشارقة، وإعادة توجيه 3 سائقين من دبي لدعم مسار أبوظبي لتفادي تفاقم التأخير."
-        return response
+        msg += "💡 **رؤيتي للموقف:** الأداء يحتاج تدخل فوري لتأمين مستودع الشارقة، وإعادة توجيه الدعم اللوجستي لمسار أبوظبي لتفادي تفاقم التأخير."
+        return msg
 
-    return "معك يا أستاذ طارق. أنا الآن أراقب الأرقام حياً؛ هل تريد التركيز على (كفاءة السائقين) أم (خطة تأمين نواقص المخازن)؟"
+    return "أهلاً بك يا أستاذ طارق. أنا أراقب البيانات حياً الآن؛ هل نبدأ بتحليل (كفاءة التوصيل) أم (تأمين المخزون)؟"
 
-# --- 4. واجهة المحادثة التفاعلية (SideBar) ---
+# --- 4. نظام المحادثة (Sidebar) ---
 with st.sidebar:
     if user_avatar:
-        st.markdown(f'<div style="text-align:center"><img src="{user_avatar}" style="border-radius:50%; width:110px; border:3px solid #00ffcc; box-shadow: 0px 4px 15px rgba(0,255,204,0.3);"></div>', unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align:center;'>المستشار الذكي طارق</h3>", unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center"><img src="{user_avatar}" style="border-radius:50%; width:110px; border:3px solid #00ffcc;"></div>', unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align:center;'>المستشار الذكي AI</h3>", unsafe_allow_html=True)
     st.markdown("---")
     
-    if 'messages' not in st.session_state: st.session_state.messages = []
-    
-    for m in st.session_state.messages:
+    if 'chat_history' not in st.session_state: st.session_state.chat_history = []
+    for m in st.session_state.chat_history:
         with st.chat_message(m["role"], avatar=user_avatar if m["role"]=="assistant" else None):
             st.write(m["content"])
 
-    if prompt := st.chat_input("تحدث معي.. كيف ترى وضع العمليات؟"):
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    if prompt := st.chat_input("تحدث معي كشريك عمل.."):
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
         
-        # استدعاء العقل التحليلي
-        res = strategic_thinking(prompt)
-        with st.chat_message("assistant", avatar=user_avatar): st.write(res)
-        st.session_state.messages.append({"role": "assistant", "content": res})
+        response = strategic_analysis(prompt)
+        with st.chat_message("assistant", avatar=user_avatar): st.write(response)
+        st.session_state.chat_history.append({"role": "assistant", "content": response})
 
-# --- 5. الداشبورد الاحترافي الكامل (تصميم Command Center) ---
-st.markdown("<h1 style='text-align:center;'>📊 Operations Command Hub</h1>", unsafe_allow_html=True)
+# --- 5. الداشبورد الاحترافي ---
+st.markdown("<h1 style='text-align:center;'>📊 Operations Command Center</h1>", unsafe_allow_html=True)
 
 if not df_inv.empty:
-    # المنطقة 1: التحليل الذكي التلقائي (في أعلى الصفحة دائماً)
-    st.info(strategic_thinking("تحليل عام"))
+    # التقرير الاستراتيجي التلقائي
+    st.info(strategic_analysis("تحليل عام"))
     
     st.markdown("---")
-    
-    # المنطقة 2: مؤشرات الأداء (KPIs)
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("المخزون الكلي", f"{df_inv['Stock_Level'].sum():,}")
-    k2.metric("شحنات متأخرة 🔴", len(delayed_df))
-    k3.metric("تحت التسليم", len(df_orders[df_orders['Status'].str.contains('طريق', na=False)]))
-    k4.metric("كفاءة الأداء", "91%")
+    # العدادات الرئيسية
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("إجمالي المخزون", f"{df_inv['Stock_Level'].sum():,}")
+    c2.metric("شحنات متأخرة 🔴", len(df_orders[df_orders['Status'].str.contains('متأخر', na=False)]))
+    c3.metric("تحت التسليم 🚚", len(df_orders[df_orders['Status'].str.contains('طريق', na=False)]))
+    c4.metric("كفاءة اليوم", "94%")
 
     st.markdown("---")
-    
-    # المنطقة 3: التحليل البصري والخريطة
+    # الرسوم والخرائط
     col_chart, col_map = st.columns([2, 1])
-    
     with col_chart:
-        st.subheader("📈 توازن المخزون (منتج/مستودع)")
+        st.subheader("📈 مستويات المخزون لكل منتج")
         fig = px.bar(df_inv, x='Warehouse', y='Stock_Level', color='Product', barmode='group', template='plotly_dark')
         st.plotly_chart(fig, use_container_width=True)
-        
     with col_map:
-        st.subheader("📍 خارطة الانتشار اللوجستي")
-        # خريطة افتراضية لمراكز الإمارات
-        map_df = pd.DataFrame({'lat': [25.2, 24.4, 25.3], 'lon': [55.3, 54.4, 55.4]})
-        st.map(map_df)
+        st.subheader("📍 خارطة العمليات")
+        st.map(pd.DataFrame({'lat': [25.2, 24.4, 25.3], 'lon': [55.3, 54.4, 55.4]}))
 
-    # المنطقة 4: عرض البيانات الحية
-    st.subheader("📋 مراجعة سجلات العمليات (Order History)")
+    st.subheader("📋 سجل العمليات الحي (Order History)")
     st.dataframe(df_orders, use_container_width=True)
-
 else:
-    st.error("⚠️ لم أتمكن من ربط البيانات. يرجى التأكد من أسماء الملفات في بيئة العمل.")
+    st.error("⚠️ سيدي، لا توجد بيانات للتحليل. تأكد من وجود الملف بالاسم الصحيح UAE_Operations_DB.xlsx بجانب الكود.")
